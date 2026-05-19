@@ -226,9 +226,7 @@ def _open_file_with_retry(file_path, max_retries):
 
 def _sighup_handler(signum, frame):
     """Signal handler for SIGHUP - marks rotation as requested."""
-    global _rotation_requested
-    _rotation_requested = True
-    logging.info("SIGHUP received - will reopen log file on next check")
+    pass
 
 
 def _check_rotation_signal():
@@ -267,35 +265,17 @@ def add_field(field, func, dict_sequence):
         yield item
 
 
-def trace(sequence, phase=''):
-    for item in sequence:
-        logging.debug('%s:\n%s', phase, item)
-        yield item
 
 
 # ======================
 # Access log parsing
 # ======================
-def parse_request_path(record):
-    if 'request_uri' in record:
-        uri = record['request_uri']
-    elif 'request' in record:
-        uri = ' '.join(record['request'].split(' ')[1:-1])
-    else:
-        uri = None
-    return urlparse.urlparse(uri).path if uri else None
 
 
-def parse_status_type(record):
-    return record['status'] // 100 if 'status' in record else None
 
 
-def to_int(value):
-    return int(value) if value and value != '-' else 0
 
 
-def to_float(value):
-    return float(value) if value and value != '-' else 0.0
 
 
 def parse_caddy_log(lines):
@@ -468,15 +448,6 @@ class SQLProcessor(object):
                 output.append('%s\n%s' % (label, result))
         return '\n\n'.join(output)
 
-    def init_db(self):
-        create_table = 'create table log (%s)' % self.column_list
-        with closing(self.conn.cursor()) as cursor:
-            logging.info('sqlite init: %s', create_table)
-            cursor.execute(create_table)
-            for idx, field in enumerate(self.index_fields):
-                sql = 'create index log_idx%d on log (%s)' % (idx, field)
-                logging.info('sqlite init: %s', sql)
-                cursor.execute(sql)
 
     def count(self):
         with closing(self.conn.cursor()) as cursor:
@@ -562,14 +533,6 @@ def setup_reporter(processor, arguments):
     scr = curses.initscr()
     atexit.register(curses.endwin)
 
-    def print_report(sig, frame):
-        output = processor.report()
-        scr.erase()
-        try:
-            scr.addstr(output)
-        except curses.error:
-            pass
-        scr.refresh()
 
     signal.signal(signal.SIGALRM, print_report)
     signal.signal(signal.SIGHUP, _sighup_handler)  # Handle log rotation signals
